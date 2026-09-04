@@ -404,10 +404,10 @@ const ENEMY_POOL = {
 
 const EVENTS = [
   { text:"A ripperdoc waves you into a back-alley clinic. \"Cheap chrome, no questions.\" Installing here is risky but free.",
-    opts:[
-      {label:'Get the chrome installed (free, +Humanity risk)', fn:(P)=>{ const pool=cyberwarePool(); const cw=pick(pool); installCyberware(P, cw, true); }},
-      {label:'Walk away', fn:(P)=>{ print('You keep walking. Some risks aren\\'t worth it.', 'flavor'); }}
-    ]},
+  opts:[
+    {label:'Get the chrome installed (free, +Humanity risk)', fn:(P)=>{ const pool=cyberwarePool(); const cw=pick(pool); installCyberware(P, cw, true); }},
+    {label:'Walk away', fn:(P)=>{ print('You keep walking. Some risks aren\'t worth it.', 'flavor'); }}
+  ]},
   { text:"A braindance parlor offers you a memory of someone else's perfect kill. Reliving it sharpens your reflexes... or scrambles something.",
     opts:[
       {label:'Jack in (+2 Cool, small Humanity cost)', fn:(P)=>{ P.cool+=2; P.humanity=clamp(P.humanity-4,0,P.maxHumanity); print('The BD ends. Your hands feel steadier. <span class="warn">-4 Humanity</span>, <span class="good">+2 Cool</span>.'); }},
