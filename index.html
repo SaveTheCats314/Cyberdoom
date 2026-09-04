@@ -119,9 +119,36 @@
 </style>
 </head>
 <body>
-  <div id="debug" style="position:fixed;z-index:99999;top:0;left:0;right:0;background:red;color:white;padding:10px;font-size:16px;">
-CYBERDOOM HTML LOADED
-</div>
+  <div id="runtime-error" style="
+  position:fixed;
+  z-index:999999;
+  top:0;
+  left:0;
+  right:0;
+  max-height:100vh;
+  overflow:auto;
+  background:#08000a;
+  color:#ff4d6d;
+  padding:20px;
+  font-family:monospace;
+  font-size:14px;
+  white-space:pre-wrap;
+  box-sizing:border-box;
+"></div>
+
+<script>
+window.onerror = function(message, source, lineno, colno, error) {
+  const box = document.getElementById('runtime-error');
+  if (box) {
+    box.innerHTML =
+      '<strong>CYBERDOOM RUNTIME ERROR</strong>\\n\\n' +
+      message + '\\n\\n' +
+      'Line: ' + lineno + '\\n' +
+      'Column: ' + colno + '\\n\\n' +
+      (error && error.stack ? error.stack : '');
+  }
+};
+</script>
 <div id="app">
   <div id="hdr">
     <div class="title">NIGHT CITY <span>// FLATLINE</span></div>
