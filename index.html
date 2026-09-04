@@ -1009,7 +1009,7 @@ function showMetaShop(){
   render();
   function render(){
     const catalog = buildShopCatalog();
-    if(!catalog.length){ print('Every contact you know has nothing left to sell you. You\\'ve bought it all.', 'flavor'); }
+    if(!catalog.length){ print('Every contact you know has nothing left to sell you. You\'ve bought it all.', 'flavor'); }
     const opts = catalog.map(it=>({
       label: it.name, sub: `${it.desc} — ${it.cost}cr`, cls:'purp', disabled: META.credits<it.cost,
       fn: async ()=>{
