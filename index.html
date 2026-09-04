@@ -578,11 +578,12 @@ function runContact(){
 }
 
 // ---------- relic cache ----------
+// ---------- relic cache ----------
 function runRelicCache(){
   const P = S.run.player;
   print(`<span class="tag relic">BLACK MARKET CACHE</span> A hidden stash, tucked behind a vending unit. Something valuable glints inside.`, 'sys');
   const avail = relicPool().filter(r=>!hasRelic(P,r.id));
-  if(!avail.length){ print('Nothing here you don\\'t already have.', 'flavor'); divider(); return advance(); }
+  if(!avail.length){ print('Nothing here you don\'t already have.', 'flavor'); divider(); return advance(); }
   const opts = avail.sort(()=>Math.random()-0.5).slice(0,3);
   const list = opts.map(r=>({ label:r.name, sub:r.desc, cls:'purp', fn:()=>{ grantRelic(P,r); divider(); advance(); } }));
   list.push({ label:'Leave it', fn:()=>{ divider(); advance(); } });
