@@ -1141,5 +1141,14 @@ function showClassSelect(hardMode){
   await showSaveSelect();
 })();
 </script>
+  <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(() => console.log('Cyberdoom offline mode ready'))
+      .catch(err => console.error('Service worker registration failed:', err));
+  });
+}
+</script>
 </body>
 </html>
