@@ -201,7 +201,10 @@ function defaultMeta(){
   };
 }
 async function peekSlot(n){
-  try{ const r = await window.storage.get(slotKey(n), false); if(r && r.value) return JSON.parse(r.value); }catch(e){}
+  try{
+    const r = localStorage.getItem(slotKey(n));
+    if(r) return JSON.parse(r);
+  }catch(e){}
   return null;
 }
 async function loadSlot(n){
@@ -212,7 +215,11 @@ async function loadSlot(n){
 }
 async function saveMeta(){
   if(SLOT==null) return;
-  try{ await window.storage.set(slotKey(SLOT), JSON.stringify(META), false); }catch(e){ console.warn('save failed', e); }
+  try{
+    localStorage.setItem(slotKey(SLOT), JSON.stringify(META));
+  }catch(e){
+    console.warn('save failed', e);
+  }
   updateHeader();
 }
 
