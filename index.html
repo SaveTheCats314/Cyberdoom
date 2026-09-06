@@ -65,7 +65,9 @@
   #hdr .title{color:var(--cyan); font-weight:bold; letter-spacing:1px; font-size:14px;}
   #hdr .title span{color:var(--magenta);}
   #hdr .sub{color:var(--purple); font-size:11px;}
-
+#hdr.run-hidden{
+  display:none;
+}
   #status{
   display:none;
   flex:0 0 auto;
@@ -474,8 +476,18 @@ function actions(list, opts={}){
     actionsEl.appendChild(b);
   });
 }
-function setStatus(on){ $('#status').classList.toggle('on', on); }
-function updateHeader(){ $('#hdrSub').textContent = `◈ ${META ? META.credits : 0} cr`; }
+function setStatus(on){
+  $('#status').classList.toggle('on', on);
+
+  // Hide the NIGHT CITY banner during an active run
+  $('#hdr').classList.toggle('run-hidden', on);
+
+  // Make sure combat HUD disappears when leaving a run
+  if(!on){
+    const enemyHud = $('#enemyStatus');
+    if(enemyHud) enemyHud.classList.remove('on');
+  }
+}function updateHeader(){ $('#hdrSub').textContent = `◈ ${META ? META.credits : 0} cr`; }
 function refreshStatus(){
   if(!S.run) return;
 
