@@ -47,7 +47,7 @@ jobs:
           if not flee_pattern.search(text):
               raise SystemExit('Patch target not found: tryFlee function')
 
-          defensive_functions = r'''function guardAction(){
+          defensive_functions = '''function guardAction(){
             const c = S.run.combat;
             if(!c) return;
 
@@ -80,78 +80,93 @@ jobs:
           }
 
           function applyHitEffects'''
-          text = flee_pattern.sub(defensive_functions, text, count=1)
+          text = flee_pattern.sub(lambda _: defensive_functions, text, count=1)
 
-          old_enemy_block = '''  if(c.enemyStunned){ print(`<b>${c.enemy.name}</b> is stunned and skips its turn.`); c.enemyStunned=false; }
-          else{
-            let d = rnd(...c.enemy.dmg) - Math.floor(P.def);
-            if(c.enemy.berserk && c.enemy.hp < c.enemy.maxHp*0.4) d = Math.round(d*1.5);
-            if(Math.random() < P.dodge){ print(`You dodge <b>${c.enemy.name}</b>'s attack completely.`,'good'); d=0; }
-            d = Math.max(0,d);
-            if(d>0){ P.hp = clamp(P.hp-d,0,P.maxHp); print(`<b>${c.enemy.name}</b> hits you for <span class="bad">${d}</span>.`); }
-          }'''
+          enemy_turn_pattern = re.compile(r"function enemyTurn\(\)\{.*?\n\}\n\nfunction checkDeath\(\)\{", re.S)
+          if not enemy_turn_pattern.search(text):
+              raise SystemExit('Patch target not found: enemyTurn function')
 
-          new_enemy_block = '''  if(c.enemyStunned){
-            print(`<b>${c.enemy.name}</b> is stunned and skips its turn.`);
-            c.enemyStunned=false;
-          }
-          else{
-            let d = rnd(...c.enemy.dmg) - Math.floor(P.def);
+          new_enemy_turn = '''function enemyTurn(){
+            const P = S.run.player; const c = S.run.combat;
+            if(!c) return;
 
-            if(c.enemy.berserk && c.enemy.hp < c.enemy.maxHp*0.4){
-              d = Math.round(d*1.5);
+            if(c.enemyBleed>0){
+              c.enemy.hp -= c.enemyBleed;
+              print(`<span class="tag">BLEED</span> ${c.enemy.name} takes <b>${c.enemyBleed}</b> bleed damage.`);
+              c.enemyBleed = 0;
+              refreshStatus();
+              if(c.enemy.hp<=0) return winCombat();
             }
 
-            let avoided = false;
+            if(c.enemyStunned){
+              print(`<b>${c.enemy.name}</b> is stunned and skips its turn.`);
+              c.enemyStunned=false;
+            }
+            else{
+              let d = rnd(...c.enemy.dmg) - Math.floor(P.def);
 
-            if(c.evading){
-              const evadeChance = c.evadeChance || 0.65;
+              if(c.enemy.berserk && c.enemy.hp < c.enemy.maxHp*0.4){
+                d = Math.round(d*1.5);
+              }
 
-              if(Math.random() < evadeChance){
-                print(
-                  `<span class="tag hack">EVADE</span> You slip past ` +
-                  `<b>${c.enemy.name}</b>'s attack completely.`,
-                  'good'
-                );
+              let avoided = false;
+
+              if(c.evading){
+                const evadeChance = c.evadeChance || 0.65;
+
+                if(Math.random() < evadeChance){
+                  print(
+                    `<span class="tag hack">EVADE</span> You slip past ` +
+                    `<b>${c.enemy.name}</b>'s attack completely.`,
+                    'good'
+                  );
+                  d = 0;
+                  avoided = true;
+                } else {
+                  print(
+                    `<span class="tag combat">EVADE FAILED</span> ` +
+                    `<b>${c.enemy.name}</b> tracks your movement.`
+                  );
+                }
+
+                c.evading = false;
+                c.evadeChance = 0;
+              }
+
+              if(!avoided && Math.random() < P.dodge){
+                print(`You dodge <b>${c.enemy.name}</b>'s attack completely.`,'good');
                 d = 0;
                 avoided = true;
-              } else {
+              }
+
+              if(c.guarding && d > 0){
+                const original = Math.max(0,d);
+                d = Math.ceil(original * 0.5);
+
                 print(
-                  `<span class="tag combat">EVADE FAILED</span> ` +
-                  `<b>${c.enemy.name}</b> tracks your movement.`
+                  `<span class="tag hack">GUARD</span> You absorb the hit. ` +
+                  `<span class="good">${original} → ${d} damage.</span>`
                 );
               }
 
-              c.evading = false;
-              c.evadeChance = 0;
+              c.guarding = false;
+              d = Math.max(0,d);
+
+              if(d>0){
+                P.hp = clamp(P.hp-d,0,P.maxHp);
+                print(`<b>${c.enemy.name}</b> hits you for <span class="bad">${d}</span>.`);
+              }
             }
+            if(P.regen>0) P.hp = clamp(P.hp+P.regen, 0, P.maxHp);
+            if(c.rallyTurns){ c.rallyTurns--; if(c.rallyTurns<=0){ P.dmgBonus-=2; P.def-=1; P.cool-=2; c.rallyTurns=null; print('Rally Cry fades.', 'flavor'); } }
+            if(P.ability.cdLeft>0) P.ability.cdLeft--;
+            refreshStatus();
+            if(checkDeath()) return;
+            combatMenu();
+          }
 
-            if(!avoided && Math.random() < P.dodge){
-              print(`You dodge <b>${c.enemy.name}</b>'s attack completely.`,'good');
-              d = 0;
-              avoided = true;
-            }
-
-            if(c.guarding && d > 0){
-              const original = Math.max(0,d);
-              d = Math.ceil(original * 0.5);
-
-              print(
-                `<span class="tag hack">GUARD</span> You absorb the hit. ` +
-                `<span class="good">${original} → ${d} damage.</span>`
-              );
-            }
-
-            c.guarding = false;
-            d = Math.max(0,d);
-
-            if(d>0){
-              P.hp = clamp(P.hp-d,0,P.maxHp);
-              print(`<b>${c.enemy.name}</b> hits you for <span class="bad">${d}</span>.`);
-            }
-          }'''
-
-          replace_once(old_enemy_block, new_enemy_block, 'enemyTurn damage block')
+          function checkDeath(){'''
+          text = enemy_turn_pattern.sub(lambda _: new_enemy_turn, text, count=1)
 
           path.write_text(text)
           PY
@@ -171,10 +186,6 @@ jobs:
       - name: Commit patch
         shell: bash
         run: |
-          if git diff --quiet -- index.html; then
-            echo "No changes needed"
-            exit 0
-          fi
           git config user.name "Cyberdoom Build Bot"
           git config user.email "actions@users.noreply.github.com"
           git add index.html
