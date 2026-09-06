@@ -735,8 +735,8 @@ const CLASSES = [
     hp:34, dmg:[4,7], def:3, tech:1, cool:4, humanity:100,
     weapon:'pistol', ability:{name:'Overwatch', desc:'+60% damage this turn, ignore 2 armor.', cd:3} },
   { id:'netrunner', name:'Netrunner', tagline:'Lives in the net more than the meat.',
-    hp:22, dmg:[2,4], def:1, tech:6, cool:3, humanity:85,
-    weapon:'monowire', ability:{name:'Quickhack', desc:'Tech damage that ignores all armor + 30% chance to stun.', cd:2} },
+    hp:24, dmg:[2,4], def:1, tech:6, cool:4, humanity:85,
+    weapon:'monowire', ability:{name:'Quickhack', desc:'Armor-piercing tech damage that scales with target HP, breaches 1 armor, and can stun.', cd:2} },
   { id:'chrome', name:'Chrome Junkie', tagline:'More metal than man. Getting worse.',
     hp:44, dmg:[5,9], def:5, tech:0, cool:0, humanity:55,
     weapon:'gorilla_arms', ability:{name:'Berserk', desc:'Damage scales up as your HP drops. Costs Humanity to use.', cd:2} },
@@ -744,14 +744,14 @@ const CLASSES = [
     hp:28, dmg:[6,9], def:2, tech:1, cool:5, humanity:95,
     weapon:'katana', ability:{name:'Blade Dance', desc:'Guaranteed crit; crits chain into a free bonus strike.', cd:3} },
   { id:'rocker', name:'Rockerboy', tagline:'Every gig might be the last encore.',
-    hp:26, dmg:[3,6], def:2, tech:2, cool:7, humanity:100,
+    hp:28, dmg:[3,6], def:2, tech:2, cool:7, humanity:100,
     weapon:'smg', ability:{name:'Rally Cry', desc:'Buff all stats for 3 turns.', cd:4} },
   { id:'nomad', name:'Nomad', tagline:'Family, road, and a well-oiled shotgun.',
     hp:32, dmg:[5,8], def:4, tech:2, cool:3, humanity:100,
     weapon:'shotgun', ability:{name:'Scavenger Instinct', desc:'Guarantees bonus loot after this fight.', cd:0} },
   { id:'fixer', name:'Fixer', tagline:'Knows a guy who knows a guy.',
-    hp:24, dmg:[3,5], def:2, tech:3, cool:6, humanity:100,
-    weapon:'silenced_pistol', ability:{name:'Connections', desc:'Free reroll of any shop, once per district.', cd:0} },
+    hp:26, dmg:[3,5], def:2, tech:3, cool:6, humanity:100,
+    weapon:'silenced_pistol', ability:{name:'Connections', desc:'Call in armor-piercing backup and mark the target for +25% eddies. Fixers also get +1 shop reroll.', cd:3} },
 ];
 
 // class-specific mastery perk applied at tier 2
@@ -762,7 +762,7 @@ const MASTERY_PASSIVE = {
   samurai:   { desc:'+10% crit chance', apply:p=>p.critBonus+=0.10 },
   rocker:    { desc:'Rally Cry lasts +1 turn', apply:p=>p._rallyBonusTurn=1 },
   nomad:     { desc:'Shop prices -15%', apply:p=>p.shopDiscount=(p.shopDiscount||0)+0.15 },
-  fixer:     { desc:'+1 extra shop reroll', apply:p=>p._extraReroll=1 },
+  fixer:     { desc:'+1 extra shop reroll', apply:p=>p._extraReroll=(p._extraReroll||0)+1 },
 };
 const MASTERY_TIERS = [10, 30, 60]; // kills required for tier1/tier2/tier3(uses wins instead, see below)
 const MASTERY_WINS_T3 = 5;
@@ -933,6 +933,7 @@ function newPlayer(cls){
     items: { stims: META.purchased.includes('perk_stim') ? 2 : 1 },
     usedSecondWind:false,
   };
+  if(p.cls==='fixer') p._extraReroll = (p._extraReroll||0) + 1;
   // meta-shop permanent perks
   ['perk_maxhp_1','perk_maxhp_2','perk_maxhp_3'].forEach(id=>{ if(META.purchased.includes(id)){ p.maxHp+=3; p.hp+=3; } });
   // class mastery bonuses
@@ -1130,12 +1131,29 @@ function runRest(){
 
 // ================= COMBAT =================
 function scaledEnemy(base, act, elite, hardMode){
-  let scale = 1 + act*0.35;
-  if(hardMode) scale *= 1.2;
+  let hpScale = 1 + act*0.35;
+  let dmgScale = 1 + act*0.35;
+
+  // Watson is the learning district: reduce burst damage and soften its forced elite.
+  if(act===0){
+    dmgScale *= 0.85;
+    if(elite || base.elite) hpScale *= 0.90;
+  }
+
+  if(hardMode){
+    hpScale *= 1.2;
+    dmgScale *= 1.2;
+  }
+
   return {
-    name: base.name, maxHp: Math.round(base.hp*scale), hp: Math.round(base.hp*scale),
-    dmg: [Math.round(base.dmg[0]*scale), Math.round(base.dmg[1]*scale)],
-    def: base.def + Math.floor(act*0.7), tech: !!base.tech, elite: !!elite || !!base.elite, berserk: !!base.berserk
+    name: base.name,
+    maxHp: Math.round(base.hp*hpScale),
+    hp: Math.round(base.hp*hpScale),
+    dmg: [Math.round(base.dmg[0]*dmgScale), Math.round(base.dmg[1]*dmgScale)],
+    def: base.def + Math.floor(act*0.7),
+    tech: !!base.tech,
+    elite: !!elite || !!base.elite,
+    berserk: !!base.berserk
   };
 }
 
@@ -1146,6 +1164,13 @@ function startCombat(baseEnemy, elite){
   print(`<span class="tag combat">${elite?'ELITE ':''}CONTACT</span> <b class="${elite?'bad':''}">${enemy.name}</b> ${elite?'blocks your path.':'steps out of the shadows.'} <span class="flavor">HP ${enemy.hp}</span>`, 'sys');
   refreshStatus();
   combatMenu();
+}
+
+function getEvadeChance(P){
+  return Math.min(
+    0.95,
+    0.65 + ((P.cool||0) * 0.015) + (hasRelic(P,'ghost_runner') ? 0.15 : 0)
+  );
 }
 
 function combatMenu(){
@@ -1159,7 +1184,7 @@ function combatMenu(){
     { label:'Use Stim', sub:`Heal 25% HP (${P.items.stims} left)`, disabled: P.items.stims<=0, fn:()=>useStim() },
     { label:'Switch Weapon', sub: P.inventory.length>1 ? 'Choose from inventory' : 'No other weapons', disabled: P.inventory.length<=1, fn:()=>switchWeaponMenu() },
     { label:'Guard', sub:'Reduce the next incoming hit by 50%', cls:'gold', fn:()=>guardAction() },
-    { label:'Evade', sub:`${hasRelic(P,'ghost_runner') ? '80' : '65'}% chance to avoid the next attack`, fn:()=>evadeAction() },
+    { label:'Evade', sub:`${Math.round(getEvadeChance(P)*100)}% chance to avoid the next attack`, fn:()=>evadeAction() },
   ]);
 }
 
@@ -1204,7 +1229,7 @@ function evadeAction(){
 
   c.evading = true;
   c.guarding = false;
-  c.evadeChance = 0.65 + (hasRelic(P,'ghost_runner') ? 0.15 : 0);
+  c.evadeChance = getEvadeChance(P);
 
   print(
     `<span class="tag hack">EVADE</span> You shift your stance and prepare to move. ` +
@@ -1240,11 +1265,15 @@ function playerAttack(useAbility){
     ab.cdLeft = Math.max(0, ab.cd - Math.max(0,P.cdrBonus));
     ab.ready = false;
     if(P.cls==='netrunner'){
-      let d = rnd(6,11) + P.tech + P.dmgBonus;
+      const targetScale = Math.max(1, Math.round(c.enemy.maxHp*0.08));
+      let d = rnd(6,11) + P.tech + P.dmgBonus + targetScale;
       totalDmg = d;
-      const stunned = Math.random()<0.3;
-      print(`<span class="tag hack">QUICKHACK</span> You burn straight through ${c.enemy.name}'s ICE for <b>${totalDmg}</b> tech damage (armor ignored).${stunned?' <span class="warn">Target stunned — skips next attack.</span>':''}`);
-      c.enemy.hp -= totalDmg; c.enemyStunned = stunned;
+      const stunChance = Math.min(0.50, 0.25 + P.tech*0.02);
+      const stunned = Math.random() < stunChance;
+      c.enemy.def = Math.max(0, c.enemy.def-1);
+      print(`<span class="tag hack">QUICKHACK</span> You breach ${c.enemy.name}'s ICE for <b>${totalDmg}</b> tech damage (armor ignored). <span class="accent">Armor -1.</span>${stunned?' <span class="warn">Target stunned — skips next attack.</span>':''}`);
+      c.enemy.hp -= totalDmg;
+      c.enemyStunned = stunned;
     } else if(P.cls==='chrome'){
       const missing = 1-(P.hp/P.maxHp);
       let d = rnd(...P.dmgRange) + Math.round(missing*10) + P.dmgBonus - c.enemy.def;
@@ -1268,8 +1297,12 @@ function playerAttack(useAbility){
       c.guaranteedLoot = true;
       print(`<span class="tag hack">SCAVENGER INSTINCT</span> You mark this kill for salvage. Guaranteed bonus loot after the fight.`);
     } else if(P.cls==='fixer'){
-      print(`<span class="tag hack">CONNECTIONS</span> Not usable mid-combat — save it for the next shop.`);
-      ab.cdLeft=0; ab.ready=true;
+      let d = rnd(5,8) + P.tech + P.cool + P.dmgBonus;
+      d = Math.max(1,d);
+      c.enemy.hp -= d;
+      totalDmg = d;
+      c.contractBonus = Math.max(c.contractBonus||0, 0.25);
+      print(`<span class="tag hack">CONNECTIONS</span> A contact paints the target from off-grid. <b>${d}</b> armor-piercing damage. <span class="good">Target marked: +25% eddies on kill.</span>`);
     } else {
       let d = Math.round((rnd(...P.dmgRange)+P.dmgBonus)*1.6) - Math.max(0,c.enemy.def-2);
       d = Math.max(1,d);
@@ -1277,6 +1310,7 @@ function playerAttack(useAbility){
       c.enemy.hp -= d; totalDmg=d;
     }
   } else {
+    const armorPerHit = hits>1 ? Math.ceil(c.enemy.def / hits) : c.enemy.def;
     for(let i=0;i<hits;i++){
       let base = rnd(...P.weapon.dmg) + P.dmgBonus + (P.weapon.tech?P.tech:0);
       if(hasRelic(P,'adrenal_plug') && P.hp < P.maxHp*0.3) base += 3;
@@ -1284,7 +1318,7 @@ function playerAttack(useAbility){
       let crit = Math.random() < critChance;
       if(i===0 && !c.firstHitUsed && hasRelic(P,"widows_kiss")){ crit=true; c.firstHitUsed=true; }
       let d = crit ? Math.round(base*1.8) : base;
-      d = Math.max(1, d - c.enemy.def);
+      d = Math.max(1, d - armorPerHit);
       c.enemy.hp -= d; totalDmg += d; anyCrit = anyCrit||crit;
       effectsHtml += applyHitEffects(P, c, d, crit);
     }
@@ -1395,7 +1429,12 @@ function winCombat(){
   const P = S.run.player; const c = S.run.combat;
   S.run.kills++;
   let eddies = rnd(10,25) + S.run.act*8;
-  eddies = Math.round(eddies * (S.run.actEddiesMult||1) * (hasRelic(P,'loyalty_chip')?1.2:1));
+  eddies = Math.round(
+    eddies *
+    (S.run.actEddiesMult||1) *
+    (hasRelic(P,'loyalty_chip')?1.2:1) *
+    (1 + (c.contractBonus||0))
+  );
   P.eddies += eddies;
   print(`<span class="tag">DOWN</span> <b>${c.enemy.name}</b> flatlines. <span class="good">+${eddies} eddies.</span>`);
 
