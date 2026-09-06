@@ -198,6 +198,40 @@
   text-overflow:ellipsis;
 }
 
+.enemyBadges{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:5px;
+  flex:0 0 auto;
+}
+
+#enemyThreat{
+  flex:0 0 auto;
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:1px 5px;
+  font-size:9px;
+  font-weight:bold;
+  letter-spacing:1px;
+}
+
+#enemyThreat.street{
+  color:var(--green);
+  border-color:rgba(61,255,154,0.45);
+}
+
+#enemyThreat.dangerous{
+  color:var(--amber);
+  border-color:rgba(255,176,32,0.55);
+}
+
+#enemyThreat.lethal{
+  color:var(--red);
+  border-color:rgba(255,71,87,0.7);
+  box-shadow:0 0 8px rgba(255,71,87,0.12);
+}
+
 #enemyType{
   flex:0 0 auto;
   color:var(--dim);
@@ -394,7 +428,10 @@ window.onerror = function(message, source, lineno, colno, error) {
 
   <div class="enemyTop">
     <span id="enemyName">HOSTILE</span>
-    <span id="enemyType">CONTACT</span>
+    <div class="enemyBadges">
+      <span id="enemyThreat">STREET</span>
+      <span id="enemyType">CONTACT</span>
+    </div>
   </div>
 
   <div class="enemyHpHead">
@@ -537,7 +574,36 @@ function refreshStatus(){
   refreshEnemyStatus();
 }
    
-  function refreshEnemyStatus(){
+function getThreatLevel(P, e, c){
+  if(e.boss || c.boss){
+    return { label:'LETHAL', cls:'lethal' };
+  }
+
+  const avgDamage = (e.dmg[0] + e.dmg[1]) / 2;
+  const expectedHit = Math.max(0, avgDamage - Math.floor(P.def));
+  const hitPressure = expectedHit / Math.max(1, P.maxHp);
+  const hpPressure = e.maxHp / Math.max(1, P.maxHp);
+
+  let score =
+    (hitPressure * 2.5) +
+    (hpPressure * 0.35) +
+    (e.def * 0.05);
+
+  if(e.elite) score += 0.5;
+  if(e.berserk) score += 0.2;
+
+  if(score >= 1.15){
+    return { label:'LETHAL', cls:'lethal' };
+  }
+
+  if(score >= 0.5){
+    return { label:'DANGEROUS', cls:'dangerous' };
+  }
+
+  return { label:'STREET', cls:'street' };
+}
+
+function refreshEnemyStatus(){
 
   const hud = $('#enemyStatus');
 
@@ -558,6 +624,11 @@ function refreshStatus(){
   hud.classList.add('on');
 
   $('#enemyName').textContent = e.name.toUpperCase();
+
+  const threat = getThreatLevel(S.run.player, e, c);
+  const threatEl = $('#enemyThreat');
+  threatEl.textContent = threat.label;
+  threatEl.className = threat.cls;
 
   const type = $('#enemyType');
 
@@ -598,6 +669,9 @@ function refreshStatus(){
     `${e.dmg[0]}–${e.dmg[1]}`;
 
   const effects = [];
+
+  if(e.tech)
+    effects.push('TECH');
 
   if(c.enemyBleed > 0)
     effects.push(`BLEED ${c.enemyBleed}`);
