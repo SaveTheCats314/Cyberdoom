@@ -766,7 +766,7 @@ function cyberwarePool(){ return CYBERWARE.filter(c=>META.unlocks.cyberware.incl
 const ALL_RELICS = [
   { id:'bloodwire',        name:'Bloodwire Coil',   desc:'Critical hits heal you 2 HP.' },
   { id:'scavenger_eye',    name:"Scavenger's Eye",  desc:'+15% chance of bonus loot after fights.' },
-  { id:'ghost_runner',     name:'Ghost Runner Chip',desc:'+15% chance to successfully flee.' },
+  { id:'ghost_runner',     name:'Ghost Runner Chip',desc:'+15% chance to successfully evade.' },
   { id:'overclock_battery',name:'Overclock Battery',desc:'-1 ability cooldown, applied once at pickup.', apply:p=>p.cdrBonus+=1 },
   { id:'second_wind',      name:'Second Wind',      desc:'The first lethal hit each run leaves you at 1 HP instead.' },
   { id:'adrenal_plug',     name:'Adrenal Plug',     desc:'+3 damage automatically whenever HP is below 30%.' },
@@ -1084,7 +1084,8 @@ function combatMenu(){
     { label: ab.cdLeft>0 ? `${ab.name} (cd ${ab.cdLeft})` : ab.name, sub: ab.desc, disabled: ab.cdLeft>0, cls:'gold', fn:()=>playerAttack(true) },
     { label:'Use Stim', sub:`Heal 25% HP (${P.items.stims} left)`, disabled: P.items.stims<=0, fn:()=>useStim() },
     { label:'Switch Weapon', sub: P.inventory.length>1 ? 'Choose from inventory' : 'No other weapons', disabled: P.inventory.length<=1, fn:()=>switchWeaponMenu() },
-    { label:'Flee', sub:'Risky — may take a hit', cls:'danger', fn:()=>tryFlee() },
+    { label:'Guard', sub:'Reduce the next incoming hit by 50%', cls:'gold', fn:()=>guardAction() },
+    { label:'Evade', sub:`${hasRelic(P,'ghost_runner') ? '80' : '65'}% chance to avoid the next attack`, fn:()=>evadeAction() },
   ]);
 }
 
@@ -1107,21 +1108,36 @@ function useStim(){
   enemyTurn();
 }
 
-function tryFlee(){
-  const P = S.run.player; const c = S.run.combat;
-  const chance = 0.55 + (hasRelic(P,'ghost_runner') ? 0.15 : 0);
-  if(Math.random()<chance){
-    print('You break contact and slip into an alley.', 'flavor');
-    S.run.combat=null; divider(); advance();
-  } else {
-    const dmg = rnd(...c.enemy.dmg);
-    P.hp = clamp(P.hp-dmg, 0, P.maxHp);
-    print(`Failed to lose them. <b>${c.enemy.name}</b> clips you for <span class="bad">${dmg}</span> on the way out.`);
-    refreshStatus();
-    if(checkDeath()) return;
-    print('You get clear anyway.', 'flavor');
-    S.run.combat=null; divider(); advance();
-  }
+function guardAction(){
+  const c = S.run.combat;
+  if(!c) return;
+
+  c.guarding = true;
+  c.evading = false;
+
+  print(
+    `<span class="tag hack">GUARD</span> You brace for impact. ` +
+    `<span class="good">The next incoming hit will be reduced by 50%.</span>`
+  );
+
+  enemyTurn();
+}
+
+function evadeAction(){
+  const P = S.run.player;
+  const c = S.run.combat;
+  if(!c) return;
+
+  c.evading = true;
+  c.guarding = false;
+  c.evadeChance = 0.65 + (hasRelic(P,'ghost_runner') ? 0.15 : 0);
+
+  print(
+    `<span class="tag hack">EVADE</span> You shift your stance and prepare to move. ` +
+    `<span class="accent">${Math.round(c.evadeChance*100)}% chance to avoid the next attack.</span>`
+  );
+
+  enemyTurn();
 }
 
 function applyHitEffects(P, c, dmgDealt, isCrit){
@@ -1218,13 +1234,64 @@ function enemyTurn(){
     if(c.enemy.hp<=0) return winCombat();
   }
 
-  if(c.enemyStunned){ print(`<b>${c.enemy.name}</b> is stunned and skips its turn.`); c.enemyStunned=false; }
+  if(c.enemyStunned){
+    print(`<b>${c.enemy.name}</b> is stunned and skips its turn.`);
+    c.enemyStunned=false;
+  }
   else{
     let d = rnd(...c.enemy.dmg) - Math.floor(P.def);
-    if(c.enemy.berserk && c.enemy.hp < c.enemy.maxHp*0.4) d = Math.round(d*1.5);
-    if(Math.random() < P.dodge){ print(`You dodge <b>${c.enemy.name}</b>'s attack completely.`,'good'); d=0; }
+
+    if(c.enemy.berserk && c.enemy.hp < c.enemy.maxHp*0.4){
+      d = Math.round(d*1.5);
+    }
+
+    let avoided = false;
+
+    if(c.evading){
+      const evadeChance = c.evadeChance || 0.65;
+
+      if(Math.random() < evadeChance){
+        print(
+          `<span class="tag hack">EVADE</span> You slip past ` +
+          `<b>${c.enemy.name}</b>'s attack completely.`,
+          'good'
+        );
+        d = 0;
+        avoided = true;
+      } else {
+        print(
+          `<span class="tag combat">EVADE FAILED</span> ` +
+          `<b>${c.enemy.name}</b> tracks your movement.`
+        );
+      }
+
+      c.evading = false;
+      c.evadeChance = 0;
+    }
+
+    if(!avoided && Math.random() < P.dodge){
+      print(`You dodge <b>${c.enemy.name}</b>'s attack completely.`,'good');
+      d = 0;
+      avoided = true;
+    }
+
+    if(c.guarding && d > 0){
+      const original = Math.max(0,d);
+      d = Math.ceil(original * 0.5);
+
+      print(
+        `<span class="tag hack">GUARD</span> You absorb the hit. ` +
+        `<span class="good">${original} → ${d} damage.</span>`
+      );
+    }
+
+    c.guarding = false;
     d = Math.max(0,d);
-    if(d>0){ P.hp = clamp(P.hp-d,0,P.maxHp); print(`<b>${c.enemy.name}</b> hits you for <span class="bad">${d}</span>.`); }
+
+    if(d>0){
+      P.hp = clamp(P.hp-d,0,P.maxHp);
+      print(`<b>${c.enemy.name}</b> hits you for <span class="bad">${d}</span>.`);
+    }
   }
   if(P.regen>0) P.hp = clamp(P.hp+P.regen, 0, P.maxHp);
   if(c.rallyTurns){ c.rallyTurns--; if(c.rallyTurns<=0){ P.dmgBonus-=2; P.def-=1; P.cool-=2; c.rallyTurns=null; print('Rally Cry fades.', 'flavor'); } }
