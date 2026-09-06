@@ -40,8 +40,15 @@
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
-  #app{max-width:640px; margin:0 auto; min-height:100%; display:flex; flex-direction:column;}
-
+#app{
+  max-width:640px;
+  margin:0 auto;
+  min-height:100%;
+  display:flex;
+  flex-direction:column;
+  padding-top:60px;
+  box-sizing:border-box;
+}
   #hdr{
     padding:10px 14px; border-bottom:1px solid var(--line);
     display:flex; justify-content:space-between; align-items:baseline;
