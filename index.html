@@ -160,6 +160,118 @@
   background:var(--cyan);
 }
 
+  #enemyStatus{
+  display:none;
+  flex:0 0 auto;
+  padding:9px 12px 10px;
+  border-bottom:1px solid rgba(255,71,87,0.35);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255,71,87,0.07),
+      rgba(255,46,136,0.025)
+    ),
+    #07090d;
+}
+
+#enemyStatus.on{
+  display:block;
+}
+
+.enemyTop{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:6px;
+}
+
+#enemyName{
+  color:var(--red);
+  font-size:12px;
+  font-weight:bold;
+  letter-spacing:.7px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+#enemyType{
+  flex:0 0 auto;
+  color:var(--dim);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:1px 5px;
+  font-size:9px;
+  letter-spacing:1px;
+}
+
+#enemyType.elite{
+  color:var(--amber);
+  border-color:rgba(255,176,32,0.5);
+}
+
+#enemyType.boss{
+  color:var(--magenta);
+  border-color:rgba(255,46,136,0.6);
+  font-weight:bold;
+}
+
+.enemyHpHead{
+  display:flex;
+  justify-content:space-between;
+  color:var(--dim);
+  font-size:10px;
+  letter-spacing:1px;
+  margin-bottom:3px;
+}
+
+.enemyHpHead b{
+  color:var(--text);
+}
+
+.enemyBar{
+  width:100%;
+  height:8px;
+  overflow:hidden;
+  border:1px solid rgba(255,71,87,0.35);
+  border-radius:4px;
+  background:#14161c;
+}
+
+.enemyBar > i{
+  display:block;
+  width:100%;
+  height:100%;
+  background:var(--red);
+  transition:width .18s ease-out, background .18s ease-out;
+}
+
+.enemyDetails{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  gap:8px;
+  margin-top:6px;
+  color:var(--dim);
+  font-size:9px;
+  letter-spacing:.6px;
+}
+
+.enemyDetails > span:last-child{
+  text-align:right;
+}
+
+.enemyDetails b{
+  color:var(--text);
+}
+
+#enemyEffects{
+  text-align:center;
+  color:var(--amber);
+  white-space:nowrap;
+}
+  
 #log{
   flex:1 1 auto;
   min-height:0;
@@ -272,7 +384,31 @@ window.onerror = function(message, source, lineno, colno, error) {
     </span>
   </div>
 
-  <div class="hudMeters">
+   <div id="enemyStatus">
+
+  <div class="enemyTop">
+    <span id="enemyName">HOSTILE</span>
+    <span id="enemyType">CONTACT</span>
+  </div>
+
+  <div class="enemyHpHead">
+    <span>HP</span>
+    <b id="enemyHp">-</b>
+  </div>
+
+  <div class="enemyBar">
+    <i id="enemyHpBar"></i>
+  </div>
+
+  <div class="enemyDetails">
+    <span>ARMOR <b id="enemyArmor">-</b></span>
+    <span id="enemyEffects"></span>
+    <span>DMG <b id="enemyDamage">-</b></span>
+  </div>
+
+</div>
+ 
+   <div class="hudMeters">
 
     <div class="hudMeter">
       <div class="hudMeterHead">
@@ -381,6 +517,86 @@ function refreshStatus(){
 
   $('#stFloor').textContent =
     `${S.run.actName.toUpperCase()} ${S.run.node+1}/${S.run.actLen}`;
+  
+  refreshEnemyStatus();
+}
+   
+  function refreshEnemyStatus(){
+
+  const hud = $('#enemyStatus');
+
+  if(
+    !S.run ||
+    !S.run.combat ||
+    !S.run.combat.enemy ||
+    S.run.combat.enemy.hp <= 0 ||
+    S.run.over
+  ){
+    hud.classList.remove('on');
+    return;
+  }
+
+  const c = S.run.combat;
+  const e = c.enemy;
+
+  hud.classList.add('on');
+
+  $('#enemyName').textContent = e.name.toUpperCase();
+
+  const type = $('#enemyType');
+
+  type.className = '';
+
+  if(e.boss || c.boss){
+    type.textContent = 'BOSS';
+    type.classList.add('boss');
+  }
+  else if(e.elite){
+    type.textContent = 'ELITE';
+    type.classList.add('elite');
+  }
+  else{
+    type.textContent = 'CONTACT';
+  }
+
+  $('#enemyHp').textContent =
+    `${Math.max(0,e.hp)}/${e.maxHp}`;
+
+  const hpPct =
+    clamp(e.hp / e.maxHp * 100, 0, 100);
+
+  $('#enemyHpBar').style.width =
+    hpPct + '%';
+
+  $('#enemyHpBar').style.background =
+    hpPct <= 25
+      ? 'var(--magenta)'
+      : hpPct <= 50
+        ? 'var(--amber)'
+        : 'var(--red)';
+
+  $('#enemyArmor').textContent =
+    e.def;
+
+  $('#enemyDamage').textContent =
+    `${e.dmg[0]}–${e.dmg[1]}`;
+
+  const effects = [];
+
+  if(c.enemyBleed > 0)
+    effects.push(`BLEED ${c.enemyBleed}`);
+
+  if(c.enemyStunned)
+    effects.push('STUNNED');
+
+  if(e.berserk && e.hp < e.maxHp * 0.4)
+    effects.push('BERSERK');
+
+  if(e.phase)
+    effects.push(`PHASE ${e.phase}`);
+
+  $('#enemyEffects').textContent =
+    effects.join(' • ');
 }
 
 // ---------- save slots ----------
