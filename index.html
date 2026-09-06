@@ -340,6 +340,7 @@
 </head>
 <body>
   <div id="runtime-error" style="
+    display:none;
   position:fixed;
   z-index:999999;
   top:0;
@@ -360,6 +361,9 @@
 window.onerror = function(message, source, lineno, colno, error) {
   const box = document.getElementById('runtime-error');
   if (box) {
+   
+    box.style.display = 'block';
+    
     box.innerHTML =
       '<strong>CYBERDOOM RUNTIME ERROR</strong>\\n\\n' +
       message + '\\n\\n' +
