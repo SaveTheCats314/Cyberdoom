@@ -67,13 +67,98 @@
   #hdr .sub{color:var(--purple); font-size:11px;}
 
   #status{
-    display:none; padding:8px 14px; border-bottom:1px solid var(--line);
-    font-size:12px; color:var(--dim); gap:4px 14px; flex-wrap:wrap;
-  }
-  #status.on{display:flex;}
-  #status b{color:var(--text);}
-  .bar{display:inline-block; width:56px; height:6px; background:#141b23; border-radius:3px; overflow:hidden; vertical-align:middle; margin-left:4px;}
-  .bar > i{display:block; height:100%;}
+  display:none;
+  flex:0 0 auto;
+  padding:8px 12px 10px;
+  border-bottom:1px solid var(--line);
+  background:rgba(7,10,14,0.98);
+  font-size:12px;
+}
+
+#status.on{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.hudTop{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  gap:8px;
+}
+
+.hudClass{
+  color:var(--cyan);
+  font-weight:bold;
+  letter-spacing:1px;
+  font-size:12px;
+}
+
+.hudDistrict{
+  color:var(--dim);
+  text-align:center;
+  font-size:11px;
+  letter-spacing:.5px;
+}
+
+.hudMoney{
+  color:var(--amber);
+  text-align:right;
+}
+
+.hudMoney b{
+  color:var(--amber);
+}
+
+.hudMeters{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+
+.hudMeter{
+  min-width:0;
+}
+
+.hudMeterHead{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:4px;
+  color:var(--dim);
+  font-size:10px;
+  letter-spacing:1px;
+}
+
+.hudMeterHead b{
+  color:var(--text);
+  font-size:11px;
+}
+
+.hudBar{
+  width:100%;
+  height:7px;
+  background:#141b23;
+  border:1px solid var(--line);
+  border-radius:4px;
+  overflow:hidden;
+}
+
+.hudBar > i{
+  display:block;
+  height:100%;
+  width:100%;
+  transition:width .18s ease-out, background .18s ease-out;
+}
+
+#barHp{
+  background:var(--green);
+}
+
+#barHum{
+  background:var(--cyan);
+}
 
 #log{
   flex:1 1 auto;
@@ -175,12 +260,45 @@ window.onerror = function(message, source, lineno, colno, error) {
     <div class="title">NIGHT CITY <span>// FLATLINE</span></div>
     <div class="sub" id="hdrSub">◈ 0 cr</div>
   </div>
-  <div id="status">
-    <span>HP <b id="stHp">-</b><span class="bar"><i id="barHp" style="background:var(--red); width:100%"></i></span></span>
-    <span>HUMANITY <b id="stHum">-</b><span class="bar"><i id="barHum" style="background:var(--cyan); width:100%"></i></span></span>
-    <span>EDDIES <b id="stEd">-</b></span>
-    <span>DISTRICT <b id="stFloor">-</b></span>
+ <div id="status">
+
+  <div class="hudTop">
+    <span class="hudClass" id="stClass">-</span>
+
+    <span class="hudDistrict" id="stFloor">-</span>
+
+    <span class="hudMoney">
+      €$ <b id="stEd">-</b>
+    </span>
   </div>
+
+  <div class="hudMeters">
+
+    <div class="hudMeter">
+      <div class="hudMeterHead">
+        <span>HP</span>
+        <b id="stHp">-</b>
+      </div>
+
+      <div class="hudBar">
+        <i id="barHp"></i>
+      </div>
+    </div>
+
+    <div class="hudMeter">
+      <div class="hudMeterHead">
+        <span>HUM</span>
+        <b id="stHum">-</b>
+      </div>
+
+      <div class="hudBar">
+        <i id="barHum"></i>
+      </div>
+    </div>
+
+  </div>
+
+</div>
   <div id="log"></div>
   <div id="actions"></div>
 </div>
@@ -224,15 +342,45 @@ function setStatus(on){ $('#status').classList.toggle('on', on); }
 function updateHeader(){ $('#hdrSub').textContent = `◈ ${META ? META.credits : 0} cr`; }
 function refreshStatus(){
   if(!S.run) return;
+
   const p = S.run.player;
-  $('#stHp').textContent = `${Math.max(0,p.hp)}/${p.maxHp}`;
-  $('#barHp').style.width = clamp(p.hp/p.maxHp*100,0,100)+'%';
-  $('#stHum').textContent = `${Math.max(0,p.humanity)}/${p.maxHumanity}`;
-  $('#barHum').style.width = clamp(p.humanity/p.maxHumanity*100,0,100)+'%';
-  const hb = $('#barHum');
-  hb.style.background = p.humanity < p.maxHumanity*0.3 ? 'var(--red)' : (p.humanity < p.maxHumanity*0.6 ? 'var(--amber)' : 'var(--cyan)');
+
+  $('#stClass').textContent = p.className.toUpperCase();
+
+  $('#stHp').textContent =
+    `${Math.max(0,p.hp)}/${p.maxHp}`;
+
+  const hpPct =
+    clamp(p.hp / p.maxHp * 100, 0, 100);
+
+  $('#barHp').style.width = hpPct + '%';
+
+  $('#barHp').style.background =
+    hpPct <= 25
+      ? 'var(--red)'
+      : hpPct <= 50
+        ? 'var(--amber)'
+        : 'var(--green)';
+
+  $('#stHum').textContent =
+    `${Math.max(0,p.humanity)}/${p.maxHumanity}`;
+
+  const humPct =
+    clamp(p.humanity / p.maxHumanity * 100, 0, 100);
+
+  $('#barHum').style.width = humPct + '%';
+
+  $('#barHum').style.background =
+    humPct <= 25
+      ? 'var(--red)'
+      : humPct <= 60
+        ? 'var(--amber)'
+        : 'var(--cyan)';
+
   $('#stEd').textContent = p.eddies;
-  $('#stFloor').textContent = `${S.run.actName} ${S.run.node+1}/${S.run.actLen}`;
+
+  $('#stFloor').textContent =
+    `${S.run.actName.toUpperCase()} ${S.run.node+1}/${S.run.actLen}`;
 }
 
 // ---------- save slots ----------
