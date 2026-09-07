@@ -339,6 +339,22 @@
     grid-template-columns:1fr 1fr; background:var(--panel);
   }
   #actions.single{grid-template-columns:1fr;}
+
+  #app.metaShopOpen #log{
+    flex:0 0 auto;
+    max-height:24dvh;
+    overflow-y:auto;
+  }
+
+  #app.metaShopOpen #actions{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    align-content:start;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  }
+
   button.act{
     font-family:inherit; font-size:13.5px; text-align:left; color:var(--text);
     background:var(--panel2); border:1px solid var(--line); border-radius:6px;
@@ -2131,6 +2147,7 @@ function buildShopCatalog(){
 }
 
 function showMetaShop(){
+  $('#app').classList.add('metaShopOpen');
   log.innerHTML='';
   print(`<span class="tag purp">FIXER NETWORK — BLACK MARKET</span> Spend Credits earned across runs on permanent unlocks. <span class="purp">You have ${META.credits} credits.</span>`, 'sys');
   render();
@@ -2188,6 +2205,7 @@ function showHistory(){
 
 // ================= SAVE SLOT SELECT =================
 async function showSaveSelect(){
+  $('#app').classList.remove('metaShopOpen');
   log.innerHTML=''; actionsEl.innerHTML=''; setStatus(false);
   print(`
     <div id="titleScreen">
@@ -2212,6 +2230,7 @@ async function showSaveSelect(){
 
 // ================= UI SCREENS =================
 function showTitle(){
+  $('#app').classList.remove('metaShopOpen');
   S.run=null; setStatus(false);
   log.innerHTML='';
   print(`
@@ -2232,6 +2251,7 @@ function showTitle(){
 }
 
 function showClassSelect(hardMode){
+  $('#app').classList.remove('metaShopOpen');
   hardMode = !!hardMode;
   const overwatchUnlocked = META.purchased.includes('perk_overwatch');
   log.innerHTML='';
@@ -2258,9 +2278,12 @@ function showClassSelect(hardMode){
   });
   log.appendChild(wrap);
   if(overwatchUnlocked){
-    actions([{ label: hardMode?'Turn Overwatch Mode OFF':'Turn Overwatch Mode ON', cls:hardMode?'':'danger', fn:()=>showClassSelect(!hardMode) }], {single:true});
+    actions([
+      { label: hardMode?'Turn Overwatch Mode OFF':'Turn Overwatch Mode ON', cls:hardMode?'':'danger', fn:()=>showClassSelect(!hardMode) },
+      { label:'Back', fn:()=>showTitle() }
+    ]);
   } else {
-    actionsEl.innerHTML='';
+    actions([{ label:'Back', fn:()=>showTitle() }], {single:true});
   }
 }
 
