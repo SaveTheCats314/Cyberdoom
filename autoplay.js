@@ -75,7 +75,7 @@
     if(!won) META.botLosses=(META.botLosses||0)+1;
     META.botRecords = [{won, className:P.className, district:S.run.actName,
       style:bot.style, steps:bot.steps, date:new Date().toISOString(),
-      weapon:P.weapon.name, relics:P.relics.map(r=>r.name), cyberware:P.cyberware.map(c=>c.name),
+      weapon:P.weapon.name, relics:P.relics.map(r=>r.name), classCores:(P.classRelics||[]).map(r=>r.name), cyberware:P.cyberware.map(c=>c.name),
       decisions:bot.decisions.slice(-120)}, ...(META.botRecords||[])].slice(0,20);
     // endRun saves this together with the normal test-slot progression.
   }
@@ -125,7 +125,7 @@
     if(ability) {
       const id=P.ability.id;
       const humCost=id==='chrome_groundpound'?Math.max(1,5-(P._chromeAbilityDiscount||0)):Math.max(1,3-(P._chromeAbilityDiscount||0));
-      const chromeSafe=!id.startsWith('chrome_') || P.humanity-humCost>P.maxHumanity*.25;
+      const chromeSafe=(!id.startsWith('chrome_') || P.humanity-humCost>P.maxHumanity*.25) && (!P._netBlackwallTap || P.humanity-4>P.maxHumanity*.25);
       if(id==='rocker_rally' && !c.rallyTurns && e.hp>attackMean*2 && P.hp>worstHit*2)
         return choose(ability,'A longer fight makes the damage and defense buff useful.');
       if(id==='nomad_scavenger' && !c.guaranteedLoot && P.hp>worstHit*3 && bot.style!=='cautious')
