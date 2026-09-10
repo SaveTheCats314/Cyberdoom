@@ -61,7 +61,6 @@
   -webkit-backdrop-filter:blur(4px);
   z-index:5;
 }
-  }
   #hdr .title{color:var(--cyan); font-weight:bold; letter-spacing:1px; font-size:14px;}
   #hdr .title span{color:var(--magenta);}
   #hdr .sub{color:var(--purple); font-size:11px;}
@@ -1086,7 +1085,7 @@ function nightCityGuideHtml(){
 
     <section class="sheetSection">
       <h3>WEAPONS & CLASS AFFINITY</h3>
-      <div class="guideRow"><b>Inventory</b> — You can carry 6 weapons by default; Nomad's Pack Rat Class Core raises the limit to 8. If a seventh is added, the oldest inventory weapon is automatically pushed out, so drop unwanted weapons before taking new gear.</div>
+      <div class="guideRow"><b>Inventory</b> — You can carry 6 weapons by default; Nomad's Pack Rat Class Core raises the limit to 8. If you exceed your capacity, the oldest unequipped weapon is automatically pushed out, so your active weapon never disappears from the inventory.</div>
       <div class="guideRow"><b>Mutations</b> — Weapons can gain run-defining effects such as Bleed, Vampiric healing, Shock/stun, armor Shred, or extra Fragment hits.</div>
       <div class="guideRow"><b>Solo — Pistol</b> — Sidearm Doctrine: +15% weapon damage and +5% crit.</div>
       <div class="guideRow"><b>Netrunner — Monowire</b> — Neural Conduit: +2 Tech damage and +5% crit.</div>
@@ -2194,7 +2193,18 @@ function newPlayer(cls){
   p.mastered = p.masteryLevel >= 6;
   return p;
 }
-function addToInventory(P, w){ P.inventory.push(w); const cap=P.inventoryCap||6; if(P.inventory.length>cap) P.inventory.shift(); }
+function addToInventory(P, w){
+  P.inventory.push(w);
+  const cap=P.inventoryCap||6;
+  if(P.inventory.length>cap){
+    const dropIndex=P.inventory.findIndex(item=>item!==P.weapon);
+    P.inventory.splice(dropIndex>=0?dropIndex:0,1);
+  }
+}
+
+function displayedCyberwareHumanityCost(P,cw){
+  return P._fullConversion ? Math.max(1,Math.ceil(cw.hum*0.5)) : cw.hum;
+}
 
 function installCyberware(P, cw, risky){
   P.cyberware.push(cw);
@@ -2478,7 +2488,9 @@ function runShop(){
   stock.push({ kind:'weapon', item: rollWeapon(pick(Object.keys(WEAPON_BASE))), price: Math.round(rnd(35,70)*disc) });
   stock.push({ kind:'weapon', item: rollWeapon(pick(Object.keys(WEAPON_BASE))), price: Math.round(rnd(35,70)*disc) });
   const cwChoices = cyberwarePool().filter(c=>!P.cyberware.includes(c));
-  stock.push({ kind:'cyber', item: pick(cwChoices.length?cwChoices:cyberwarePool()), price: Math.round(rnd(50,90)*disc) });
+  if(cwChoices.length){
+    stock.push({ kind:'cyber', item: pick(cwChoices), price: Math.round(rnd(50,90)*disc) });
+  }
   stock.push({ kind:'stim', item:{name:'Combat Stim (+heal mid-fight)'}, price: Math.round(25*disc) });
 
   let rerollsLeft = 1 + (P._extraReroll||0);
@@ -2487,7 +2499,11 @@ function runShop(){
     const opts = stock.map((s,i)=>{
       let label, sub;
       if(s.kind==='weapon'){ label=`Buy: ${s.item.name}`; sub=`${rarityBadge(s.item.rarity||weaponRarityFromTier(s.item.tier||0))} ${s.item.dmg[0]}-${s.item.dmg[1]} dmg, crit ${Math.round(s.item.crit*100)}% — ${s.price}e`; }
-      else if(s.kind==='cyber'){ label=`Install: ${s.item.name}`; sub=`${rarityBadge(cyberwareRarity(s.item))} ${s.item.desc} (${s.item.slot}) — ${s.price}e, -${s.item.hum} Humanity`; }
+      else if(s.kind==='cyber'){
+        const shownHum=displayedCyberwareHumanityCost(P,s.item);
+        label=`Install: ${s.item.name}`;
+        sub=`${rarityBadge(cyberwareRarity(s.item))} ${s.item.desc} (${s.item.slot}) — ${s.price}e, -${shownHum} Humanity${P._fullConversion?' [FULL CONVERSION]':''}`;
+      }
       else { label=`Buy: ${s.item.name}`; sub=`${s.price}e`; }
       return { label, sub, cls:'gold', disabled: P.eddies<s.price, fn:()=>{
           P.eddies -= s.price;
@@ -2719,6 +2735,17 @@ function applyHitEffects(P, c, dmgDealt, isCrit){
   return extra;
 }
 
+
+function checkBossPhase(){
+  const c=S.run?.combat;
+  if(!c?.boss || !c.enemy || c.enemy.phase!==1 || c.enemy.hp<=0 || c.enemy.hp>c.enemy.maxHp*0.5) return false;
+  c.enemy.phase=2;
+  c.enemy.dmg=[c.enemy.dmg[0]+3,c.enemy.dmg[1]+4];
+  print(`<span class="tag boss">PHASE 2</span> Smasher's chassis vents smoke. "Now we're talking." <span class="bad">His attacks hit harder.</span>`);
+  refreshStatus();
+  return true;
+}
+
 function playerAttack(useAbility){
   const P = S.run.player;
   const c = S.run.combat;
@@ -2729,8 +2756,10 @@ function playerAttack(useAbility){
   if(!useAbility && P._chromeHydraulic && P.weapon.baseId==='gorilla_arms') hits += 1;
   let totalDmg = 0, anyCrit=false, effectsHtml='';
   const firstWeaponAttack = !useAbility && !c._classFirstWeaponUsed;
+  const firstKatanaAttack = !useAbility && P.weapon.baseId==='katana' && !c._firstKatanaUsed;
   if(!useAbility){
     c._classFirstWeaponUsed = true;
+    if(P.weapon.baseId==='katana') c._firstKatanaUsed = true;
     P._weaponAttackCount = (P._weaponAttackCount||0)+1;
   }
   const blackhandProc = !useAbility && P._blackhandProtocol && P._weaponAttackCount%3===0;
@@ -2808,11 +2837,16 @@ function playerAttack(useAbility){
       print(`<span class="tag crit">IAIJUTSU</span> One draw. One cut. <b>${d}</b> damage through half armor. <span class="warn">CRITICAL!</span>${effectsHtml}`);
     }
     else if(abilityId==='rocker_rally'){
-      P.dmgBonus += 2;
-      P.def += 1;
-      P.cool += 2;
-      c.rallyTurns = 3 + (P._rockerEncore||0) + (P._rockerFeedbackLoop||0);
-      print(`<span class="tag hack">RALLY CRY</span> Adrenaline and distortion pedals. <span class="good">+2 dmg, +1 def, +2 cool for ${c.rallyTurns} turns.</span>`);
+      const duration = 3 + (P._rockerEncore||0) + (P._rockerFeedbackLoop||0);
+      const alreadyActive = !!c.rallyTurns;
+      if(!alreadyActive){
+        P.dmgBonus += 2;
+        P.def += 1;
+        P.cool += 2;
+      }
+      c.rallyTurns = duration;
+      c.rallyFresh = true;
+      print(`<span class="tag hack">RALLY CRY</span> Adrenaline and distortion pedals. <span class="good">${alreadyActive?'Buff refreshed':' +2 dmg, +1 def, +2 cool'} for ${duration} player turns.</span>`);
     }
     else if(abilityId==='rocker_feedback'){
       const suppress = 2 + (P._rockerEncore||0) + (P._rockerFeedbackLoop||0);
@@ -2893,7 +2927,7 @@ function playerAttack(useAbility){
       if(hasRelic(P,'adrenal_plug') && P.hp < P.maxHp*0.3) base += 3;
       let classMult=1;
       if(firstWeaponAttack && P._soloDeadCenter) classMult += P._soloDeadCenter;
-      if(firstWeaponAttack && P._samuraiNoSecondStrike && P.weapon.baseId==='katana') classMult += 1.0;
+      if(firstKatanaAttack && P._samuraiNoSecondStrike) classMult += 1.0;
       if(P._executeMult && c.enemy.hp<c.enemy.maxHp*0.40) classMult += P._executeMult;
       if(P._chromeLimitersOff && P.humanity<=P.maxHumanity*0.25) classMult += P._chromeLimitersOff;
       if(P._juryRigPrimed) classMult += P._nomadJuryRig||0;
@@ -2902,7 +2936,7 @@ function playerAttack(useAbility){
       base=Math.round(base*classMult);
       let critChance = P.weapon.crit + P.critBonus + (affinity?.critBonus||0) + (berserkMode?0.25:0);
       let crit = Math.random() < critChance;
-      if((firstWeaponAttack && P._samuraiPerfectDraw && P.weapon.baseId==='katana') || P._stillWaterPrimed || blackhandProc){ crit=true; }
+      if((firstKatanaAttack && P._samuraiPerfectDraw) || P._stillWaterPrimed || blackhandProc){ crit=true; }
       let openingExecution = false;
       if(i===0 && !c.firstHitUsed && hasRelic(P,"widows_kiss")){
         crit=true;
@@ -2959,6 +2993,7 @@ function playerAttack(useAbility){
 
   refreshStatus();
   if(c.enemy.hp <= 0) return winCombat();
+  checkBossPhase();
   enemyTurn();
 }
 
@@ -2972,6 +3007,7 @@ function enemyTurn(){
     c.enemyBleed = 0;
     refreshStatus();
     if(c.enemy.hp<=0) return winCombat();
+    checkBossPhase();
   }
 
   if(c.enemyStunned){
@@ -3061,11 +3097,23 @@ function enemyTurn(){
     }
   }
   if(P.regen>0) P.hp = clamp(P.hp+P.regen, 0, P.maxHp);
-  if(c.rallyTurns){ c.rallyTurns--; if(c.rallyTurns<=0){ P.dmgBonus-=2; P.def-=1; P.cool-=2; c.rallyTurns=null; print('Rally Cry fades.', 'flavor'); } }
+  if(c.rallyTurns){
+    if(c.rallyFresh){
+      c.rallyFresh=false;
+    } else {
+      c.rallyTurns--;
+      if(c.rallyTurns<=0){
+        P.dmgBonus-=2; P.def-=1; P.cool-=2;
+        c.rallyTurns=null;
+        print('Rally Cry fades.', 'flavor');
+      }
+    }
+  }
   if(P.ability.cdLeft>0) P.ability.cdLeft--;
   refreshStatus();
   if(checkDeath()) return;
   if(c.enemy.hp<=0) return winCombat();
+  checkBossPhase();
   combatMenu();
 }
 
@@ -3097,6 +3145,13 @@ function checkDeath(){
 
 function winCombat(){
   const P = S.run.player; const c = S.run.combat;
+  if(c.boss){
+    S.run.kills++;
+    S.run.eliteKills++;
+    print(`<span class="tag boss">FLATLINE — CONFIRMED</span> <span class="good">Adam Smasher hits the floor. For one silent second, Night City feels almost survivable.</span>`);
+    refreshStatus();
+    return endRun(true);
+  }
   S.run.kills++;
   const rewardTier = S.run.act >= 3 ? S.run.act-1 : S.run.act;
   let eddies = rnd(10,25) + rewardTier*8 + (c.midboss ? 40 : 0);
@@ -3168,7 +3223,7 @@ function winCombat(){
         const cw = pick(cwChoices);
         print(`<span class="tag loot">SALVAGE</span> Found cyberware: <b>${cw.name}</b>.`);
         actions([
-          { label:`Install ${cw.name}`, sub:`${rarityBadge(cyberwareRarity(cw))} ${cw.desc} (-${cw.hum} Humanity)`, cls:'gold', fn:()=>{ installCyberware(P,cw,false); divider(); advance(); } },
+          { label:`Install ${cw.name}`, sub:`${rarityBadge(cyberwareRarity(cw))} ${cw.desc} (-${displayedCyberwareHumanityCost(P,cw)} Humanity${P._fullConversion?' · FULL CONVERSION':''})`, cls:'gold', fn:()=>{ installCyberware(P,cw,false); divider(); advance(); } },
           { label:'Leave it — not worth the Humanity', fn:()=>{ divider(); advance(); } },
         ]);
         refreshStatus();
@@ -3232,32 +3287,12 @@ function startBossFight(){
   const hardBonus = run.hardMode ? 1.2 : 1;
   const boss = {
     name:'Adam Smasher', maxHp: Math.round(150*heatBonus*hardBonus), hp: Math.round(150*heatBonus*hardBonus),
-    dmg:[10,16], def:6, phase:1, elite:true, boss:true
+    dmg:[Math.round(10*hardBonus),Math.round(16*hardBonus)], def:6, phase:1, elite:true, boss:true
   };
   run.combat = { enemy: boss, boss:true, enemyBleed:0, firstHitUsed:false };
   refreshStatus();
   combatMenu();
 }
-
-const _origWinCombat = winCombat;
-winCombat = function(){
-  const c = S.run.combat;
-  if(c.boss){
-    if(c.enemy.phase===1 && c.enemy.hp <= c.enemy.maxHp*0.5 && c.enemy.hp>0){
-      c.enemy.phase=2; c.enemy.dmg=[c.enemy.dmg[0]+3, c.enemy.dmg[1]+4];
-      print(`<span class="tag boss">PHASE 2</span> Smasher's chassis vents smoke. "Now we're talking." <span class="bad">His attacks hit harder.</span>`);
-      refreshStatus();
-      return enemyTurn();
-    }
-    if(c.enemy.hp<=0){
-      print(`<span class="tag boss">FLATLINE — CONFIRMED</span> <span class="good">Adam Smasher hits the floor. For one silent second, Night City feels almost survivable.</span>`);
-      return endRun(true);
-    }
-    refreshStatus();
-    return enemyTurn();
-  }
-  return _origWinCombat();
-};
 
 // ================= END OF RUN =================
 function creditsForRun(run, won){
