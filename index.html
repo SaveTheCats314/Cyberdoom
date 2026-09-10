@@ -2596,7 +2596,7 @@ function switchWeaponMenu(){
   const P = S.run.player;
   const opts = P.inventory.map((w,i)=>({
     label:(w===P.weapon?'[Equipped] ':'')+w.name,
-    sub:`${w.dmg[0]}-${w.dmg[1]} dmg, crit ${Math.round(w.crit*100)}%${w.mutation?' ⟨'+w.mutation.name+'⟩':''}`,
+    sub:`${rarityBadge(w.rarity||weaponRarityFromTier(w.tier||0))} ${w.dmg[0]}-${w.dmg[1]} dmg, crit ${Math.round(w.crit*100)}%${w.mutation?' ⟨'+w.mutation.name+'⟩':''}`,
     fn:()=>{ P.weapon=w; if(P._nomadJuryRig){P._juryRigPrimed=true;} print(`Switched to <b>${w.name}</b>.${P._nomadJuryRig?' <span class="purp">Jury-Rig primed.</span>':''}`); combatMenu(); }
   }));
 
@@ -2897,6 +2897,7 @@ function playerAttack(useAbility){
       if(P._executeMult && c.enemy.hp<c.enemy.maxHp*0.40) classMult += P._executeMult;
       if(P._chromeLimitersOff && P.humanity<=P.maxHumanity*0.25) classMult += P._chromeLimitersOff;
       if(P._juryRigPrimed) classMult += P._nomadJuryRig||0;
+      if(P._guardAttackPrimed) classMult += P._soloCoverDiscipline||0;
       if(blackhandProc) classMult += 0.50;
       base=Math.round(base*classMult);
       let critChance = P.weapon.crit + P.critBonus + (affinity?.critBonus||0) + (berserkMode?0.25:0);
@@ -2921,6 +2922,7 @@ function playerAttack(useAbility){
       effectsHtml += ' <span class="purp">ICEBREAKER: armor -1.</span>';
     }
     if(P._juryRigPrimed) P._juryRigPrimed=false;
+    if(P._guardAttackPrimed) P._guardAttackPrimed=false;
     if(P._stillWaterPrimed) P._stillWaterPrimed=false;
     print(`<span class="tag${anyCrit?' crit':''}">HIT</span> ${P.weapon.name} deals <b>${totalDmg}</b> damage${hits>1?` across ${hits} shots`:''}.${affinity?' <span class="accent">CLASS AFFINITY</span>':''}${anyCrit?' <span class="warn">CRITICAL!</span>':''}${berserkMode?' <span class="bad">(chrome-fueled rage)</span>':''}${blackhandProc?' <span class="purp">BLACKHAND PROTOCOL</span>':''}${effectsHtml}`);
   }
@@ -3159,14 +3161,14 @@ function winCombat(){
     if(Math.random()<0.5){
       const w = rollWeapon(pick(Object.keys(WEAPON_BASE)), c.enemy.elite?rnd(3,6):undefined);
       addToInventory(P,w);
-      print(`<span class="tag loot">SALVAGE</span> Looted <b>${w.name}</b>.`);
+      print(`<span class="tag loot">SALVAGE</span> ${rarityBadge(w.rarity||weaponRarityFromTier(w.tier||0))} Looted <b>${w.name}</b>.`);
     } else {
       const cwChoices = cyberwarePool().filter(x=>!P.cyberware.includes(x));
       if(cwChoices.length){
         const cw = pick(cwChoices);
         print(`<span class="tag loot">SALVAGE</span> Found cyberware: <b>${cw.name}</b>.`);
         actions([
-          { label:`Install ${cw.name}`, sub:cw.desc+` (-${cw.hum} Humanity)`, cls:'gold', fn:()=>{ installCyberware(P,cw,false); divider(); advance(); } },
+          { label:`Install ${cw.name}`, sub:`${rarityBadge(cyberwareRarity(cw))} ${cw.desc} (-${cw.hum} Humanity)`, cls:'gold', fn:()=>{ installCyberware(P,cw,false); divider(); advance(); } },
           { label:'Leave it — not worth the Humanity', fn:()=>{ divider(); advance(); } },
         ]);
         refreshStatus();
