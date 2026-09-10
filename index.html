@@ -2861,9 +2861,6 @@ function playerAttack(useAbility){
       const affinity = getClassWeaponAffinity(P);
       let base = rnd(...P.weapon.dmg) + P.dmgBonus + (P.weapon.tech?P.tech:0);
       if(P._ballisticMastery && P.weapon.tag==='ballistic') base += P._ballisticMastery;
-      if(P._chromeMetalDividend) base += P.cyberware.length;
-      if(P._rockerStagePresence) base += Math.floor((P.cool||0)*0.25);
-      if(P._rockerFullAutoChorus && P.weapon.baseId==='smg') base += i;
       if(affinity){
         base += (affinity.techBonus||0) + (affinity.flatDamage||0);
         if(affinity.damageMult) base = Math.round(base*affinity.damageMult);
@@ -2886,6 +2883,9 @@ function playerAttack(useAbility){
     for(let i=0;i<hits;i++){
       let base = rnd(...P.weapon.dmg) + P.dmgBonus + (P.weapon.tech?P.tech:0);
       if(P._ballisticMastery && P.weapon.tag==='ballistic') base += P._ballisticMastery;
+      if(P._chromeMetalDividend) base += P.cyberware.length;
+      if(P._rockerStagePresence) base += Math.floor((P.cool||0)*0.25);
+      if(P._rockerFullAutoChorus && P.weapon.baseId==='smg') base += i;
       if(affinity){
         base += (affinity.techBonus||0) + (affinity.flatDamage||0);
         if(affinity.damageMult) base = Math.round(base * affinity.damageMult);
