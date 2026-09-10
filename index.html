@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Cyberdoom</title>
+  <link rel="stylesheet" href="autoplay.css">
   <link rel="manifest" href="manifest.json">
 
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -801,6 +802,7 @@ function print(html, cls){
 }
 function divider(){ print('<hr class="divider">'); }
 function actions(list, opts={}){
+  window.CyberdoomBot?.observe(list);
   actionsEl.innerHTML = '';
   actionsEl.className = (list.length<=1 || opts.single) ? 'single' : '';
   list.forEach((a,i)=>{
@@ -808,7 +810,7 @@ function actions(list, opts={}){
     b.className = 'act' + (a.cls ? ' '+a.cls : '');
     b.innerHTML = `<span class="k">${a.key || (i+1)}›</span>${a.label}${a.sub?`<small>${a.sub}</small>`:''}`;
     if(a.disabled) b.disabled = true;
-    b.onclick = ()=>{ if(a.disabled) return; a.fn(); };
+    b.onclick = ()=>{ if(a.disabled) return; window.CyberdoomBot?.pause('Manual control — press Play to resume.'); a.fn(); };
     actionsEl.appendChild(b);
   });
 }
@@ -882,6 +884,7 @@ function closeCharacterSheet(){
 }
 
 function openCharacterSheet(){
+  window.CyberdoomBot?.pause('Character sheet open — press Play when ready.');
   if(!S.run || S.run.over) return;
   renderCharacterSheet();
   const sheet = $('#charSheet');
@@ -2233,6 +2236,7 @@ const ACTS = [
 ];
 
 async function startRun(cls, hardMode){
+  window.CyberdoomBot?.beginRun();
   META.runsStarted++; saveMeta();
   const player = newPlayer(cls);
   S.run = { player, act:0, node:0, actName:ACTS[0].name, actLen:ACTS[0].len, heat:0,
@@ -2258,6 +2262,7 @@ function runStartChoice(){
   );
 
   const opts = choices.map(r=>({
+    bot:{kind:'relic', relic:r},
     label:`Take ${r.name}`,
     sub:`${rarityBadge(relicRarity(r))} ${r.desc}`,
     cls:'purp',
@@ -2422,7 +2427,7 @@ function runRelicCache(){
   const avail = relicPool().filter(r=>!hasRelic(P,r.id));
   if(!avail.length){ print('Nothing here you don\'t already have.', 'flavor'); divider(); return advance(); }
   const opts = weightedSampleByRarity(avail,3,relicRarity);
-  const list = opts.map(r=>({ label:r.name, sub:`${rarityBadge(relicRarity(r))} ${r.desc}`, cls:'purp', fn:()=>{ grantRelic(P,r); divider(); advance(); } }));
+  const list = opts.map(r=>({ bot:{kind:"relic", relic:r}, label:r.name, sub:`${rarityBadge(relicRarity(r))} ${r.desc}`, cls:'purp', fn:()=>{ grantRelic(P,r); divider(); advance(); } }));
   list.push({ label:'Leave it', fn:()=>{ divider(); advance(); } });
   actions(list);
 }
@@ -2489,7 +2494,7 @@ function runShop(){
       if(s.kind==='weapon'){ label=`Buy: ${s.item.name}`; sub=`${rarityBadge(s.item.rarity||weaponRarityFromTier(s.item.tier||0))} ${s.item.dmg[0]}-${s.item.dmg[1]} dmg, crit ${Math.round(s.item.crit*100)}% — ${s.price}e`; }
       else if(s.kind==='cyber'){ label=`Install: ${s.item.name}`; sub=`${rarityBadge(cyberwareRarity(s.item))} ${s.item.desc} (${s.item.slot}) — ${s.price}e, -${s.item.hum} Humanity`; }
       else { label=`Buy: ${s.item.name}`; sub=`${s.price}e`; }
-      return { label, sub, cls:'gold', disabled: P.eddies<s.price, fn:()=>{
+      return { label, sub, bot:{kind:'shop', itemKind:s.kind, item:s.item, price:s.price}, cls:'gold', disabled: P.eddies<s.price, fn:()=>{
           P.eddies -= s.price;
           if(s.kind==='weapon'){ addToInventory(P,s.item); print(`Bought <b>${s.item.name}</b>.`,'good'); }
           else if(s.kind==='cyber'){ installCyberware(P, s.item, false); }
@@ -2595,6 +2600,7 @@ function combatMenu(){
 function switchWeaponMenu(){
   const P = S.run.player;
   const opts = P.inventory.map((w,i)=>({
+    bot:{kind:'equip', weapon:w},
     label:(w===P.weapon?'[Equipped] ':'')+w.name,
     sub:`${rarityBadge(w.rarity||weaponRarityFromTier(w.tier||0))} ${w.dmg[0]}-${w.dmg[1]} dmg, crit ${Math.round(w.crit*100)}%${w.mutation?' ⟨'+w.mutation.name+'⟩':''}`,
     fn:()=>{ P.weapon=w; if(P._nomadJuryRig){P._juryRigPrimed=true;} print(`Switched to <b>${w.name}</b>.${P._nomadJuryRig?' <span class="purp">Jury-Rig primed.</span>':''}`); combatMenu(); }
@@ -3143,7 +3149,7 @@ function winCombat(){
     if(avail.length){
       const opts3 = weightedSampleByRarity(avail,3,relicRarity);
       print(`<span class="tag relic">ELITE DROP</span> Choose a relic to take from the wreckage:`);
-      const list = opts3.map(r=>({ label:r.name, sub:`${rarityBadge(relicRarity(r))} ${r.desc}`, cls:'purp', fn:()=>{ grantRelic(P,r); divider(); actions([{label:'Move on', fn:()=>advance()}],{single:true}); } }));
+      const list = opts3.map(r=>({ bot:{kind:"relic", relic:r}, label:r.name, sub:`${rarityBadge(relicRarity(r))} ${r.desc}`, cls:'purp', fn:()=>{ grantRelic(P,r); divider(); actions([{label:'Move on', fn:()=>advance()}],{single:true}); } }));
       list.push({ label:'Skip — none of these', fn:()=>{ divider(); actions([{label:'Move on', fn:()=>advance()}],{single:true}); } });
       actions(list);
       refreshStatus();
@@ -3268,6 +3274,7 @@ function creditsForRun(run, won){
 }
 
 async function endRun(won){
+  window.CyberdoomBot?.finishRun(won);
   setStatus(false);
   S.run.over=true;
   actionsEl.innerHTML='';
@@ -3405,6 +3412,7 @@ function showHistory(){
 
 // ================= SAVE SLOT SELECT =================
 async function showSaveSelect(){
+  window.CyberdoomBot?.leave();
   $('#app').classList.remove('metaShopOpen');
   log.innerHTML=''; actionsEl.innerHTML=''; setStatus(false);
   print(`
@@ -3442,6 +3450,7 @@ function showTitle(){
     </div>
   `);
   actions([
+    { label:'Autoplay Lab', sub:'Watch a bot play in its own test save', cls:'purp', fn:()=>window.CyberdoomBot.enter() },
     { label:'Jack In', sub:'Start a new run', cls:'gold', fn:()=>showClassSelect() },
     { label:'Fixer Network', sub:'Spend credits on permanent unlocks', cls:'purp', fn:()=>showMetaShop() },
     { label:'Class Mastery', sub:'View mastery progress', fn:()=>showMastery() },
@@ -3534,6 +3543,7 @@ function showClassSelect(hardMode){
   await showSaveSelect();
 })();
 </script>
+  <script src="autoplay.js"></script>
   <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
