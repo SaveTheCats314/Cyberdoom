@@ -1,0 +1,11 @@
+#botPanel {padding:10px 14px; border-bottom:1px solid var(--line); background:var(--panel); font-size:12px; flex-shrink:0;}
+#botPanel[hidden] {display:none;}
+#botPanel summary {cursor:pointer; color:var(--cyan); font-weight:bold; padding:3px 0;}
+#botPanel .botControls {display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px;}
+#botPanel button, #botPanel select {font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:5px; padding:8px; min-height:36px;}
+#botPanel button:disabled {opacity:.4;}
+#botPanel button:focus-visible, #botPanel select:focus-visible {outline:2px solid var(--cyan);}
+#botNote {margin:8px 0 4px; overflow-wrap:anywhere;}
+#botStats, #botPanel .botHelp {color:var(--dim); margin:4px 0;}
+#botHistory {max-height:100px; overflow:auto; margin-top:8px;}
+#botHistory p {margin:4px 0;}
