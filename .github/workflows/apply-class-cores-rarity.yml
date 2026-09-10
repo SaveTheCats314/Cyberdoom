@@ -15,11 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Refresh patch anchor
-        run: python .github/scripts/fix_class_core_patch_anchor.py
-
-      - name: Apply class core and rarity patch
-        run: python .github/scripts/apply_class_cores_rarity.py
+      - name: Fix class core combat hooks
+        run: python .github/scripts/fix_class_core_combat_hooks.py
 
       - name: Verify JavaScript syntax
         shell: bash
@@ -33,7 +30,7 @@ jobs:
           PY
           node --check /tmp/cyberdoom.js
 
-      - name: Commit class core and rarity systems
+      - name: Commit class core combat fixes
         shell: bash
         run: |
           if git diff --quiet -- index.html; then
@@ -43,5 +40,5 @@ jobs:
           git config user.name "Cyberdoom Build Bot"
           git config user.email "actions@users.noreply.github.com"
           git add index.html
-          git commit -m "Add class core relics and rarity system"
+          git commit -m "Fix class core combat hooks and rarity labels"
           git push
