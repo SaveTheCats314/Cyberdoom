@@ -1,0 +1,44 @@
+name: Apply Class Cores and Rarity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-class-cores-rarity.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply class core and rarity patch
+        run: python .github/scripts/apply_class_cores_rarity.py
+
+      - name: Verify JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('index.html').read_text()
+          scripts = '\n'.join(re.findall(r'<script[^>]*>(.*?)</script>', html, flags=re.S))
+          Path('/tmp/cyberdoom.js').write_text(scripts)
+          PY
+          node --check /tmp/cyberdoom.js
+
+      - name: Commit class core and rarity systems
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git config user.name "Cyberdoom Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "Add class core relics and rarity system"
+          git push
