@@ -7,13 +7,16 @@ on:
       - '.github/workflows/debug-static.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Apply gameplay debug fixes
+        run: python .github/scripts/debug_fix_pass.py
 
       - name: Extract game JavaScript
         run: |
@@ -39,3 +42,15 @@ jobs:
             --rule 'no-dupe-keys:error' \
             --rule 'no-func-assign:error' \
             --rule 'valid-typeof:error'
+
+      - name: Commit verified debug fixes
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No gameplay changes needed"
+            exit 0
+          fi
+          git config user.name "Cyberdoom Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "Fix boss phases and gameplay edge cases"
+          git push
