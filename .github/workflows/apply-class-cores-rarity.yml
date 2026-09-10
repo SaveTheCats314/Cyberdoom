@@ -15,8 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fix class core combat hooks
-        run: python .github/scripts/fix_class_core_combat_hooks.py
+      - name: Fix precise class core combat hooks
+        run: python .github/scripts/fix_class_core_combat_hooks_precise.py
 
       - name: Verify JavaScript syntax
         shell: bash
@@ -30,7 +30,7 @@ jobs:
           PY
           node --check /tmp/cyberdoom.js
 
-      - name: Commit class core combat fixes
+      - name: Commit precise class core fix
         shell: bash
         run: |
           if git diff --quiet -- index.html; then
@@ -40,5 +40,5 @@ jobs:
           git config user.name "Cyberdoom Build Bot"
           git config user.email "actions@users.noreply.github.com"
           git add index.html
-          git commit -m "Fix class core combat hooks and rarity labels"
+          git commit -m "Correct class core weapon modifier placement"
           git push
