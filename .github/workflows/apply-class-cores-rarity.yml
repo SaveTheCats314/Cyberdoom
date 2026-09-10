@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Refresh patch anchor
+        run: python .github/scripts/fix_class_core_patch_anchor.py
+
       - name: Apply class core and rarity patch
         run: python .github/scripts/apply_class_cores_rarity.py
 
